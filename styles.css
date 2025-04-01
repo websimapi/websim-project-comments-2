@@ -226,3 +226,23 @@ h3 {
     text-align: center;
     color: #718096;
 }
+
+#generated-components-container {
+    margin-bottom: 30px;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.generated-component {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.generated-component:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}

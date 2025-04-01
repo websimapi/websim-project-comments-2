@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentProject = null;
     let currentUser = null;
 
+    // Create a container for generated components at the top of the page
+    const generatedComponentsContainer = document.createElement('div');
+    generatedComponentsContainer.id = 'generated-components-container';
+    document.querySelector('.container').insertBefore(
+        generatedComponentsContainer, 
+        document.querySelector('header')
+    );
+
     try {
         if (isWebsim) {
             // Get current project info from Websim API
@@ -13,6 +21,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Load comments for the current project
             await loadComments(currentProject.id);
+            
+            // Process unprocessed comments
+            await processUnprocessedComments();
+            
+            // Load and execute all processed comments
+            await loadAndExecuteProcessedComments();
             
             // Subscribe to comment status changes
             subscribeToCommentStatusChanges(async (statusRecords) => {
@@ -63,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
         }
     }
-    
+
     // Update processing status for all comments
     async function updateAllCommentStatuses(commentsData) {
         // Collect all comment IDs to check
@@ -83,7 +97,73 @@ document.addEventListener('DOMContentLoaded', async () => {
             await getCommentProcessingStatus(commentId);
         }
     }
-    
+
+    // Process all unprocessed comments
+    async function processUnprocessedComments() {
+        if (!isWebsim) return;
+        
+        try {
+            // Get all comments for this project
+            const response = await fetch(`/api/v1/projects/${currentProject.id}/comments`);
+            if (!response.ok) {
+                throw new Error(`Failed to load comments: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (!data.comments || !data.comments.data) return;
+            
+            // Get all comments, including replies
+            const allComments = data.comments.data;
+            
+            // Process each comment
+            for (const { comment } of allComments) {
+                // Check if this comment has been processed
+                const status = await getCommentProcessingStatus(comment.id);
+                
+                // If not processed, process it
+                if (!status.processed) {
+                    console.log(`Processing comment: ${comment.id}`);
+                    
+                    // Get comment content
+                    let commentContent = '';
+                    if (comment.raw_content) {
+                        commentContent = comment.raw_content;
+                    } else if (comment.content && comment.content.children) {
+                        // Extract text from the document structure
+                        commentContent = extractTextFromDocument(comment.content);
+                    }
+                    
+                    if (commentContent) {
+                        // Process with LLM
+                        await processCommentWithLLM(comment.id, commentContent);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error processing unprocessed comments:', error);
+        }
+    }
+
+    // Extract text content from document structure
+    function extractTextFromDocument(document) {
+        if (!document || !document.children) return '';
+        
+        let text = '';
+        
+        for (const block of document.children) {
+            if (block.type === 'paragraph' && block.children) {
+                for (const inline of block.children) {
+                    if (inline.type === 'text') {
+                        text += inline.text + ' ';
+                    }
+                }
+                text += '\n';
+            }
+        }
+        
+        return text.trim();
+    }
+
     // Update status indicators in the UI based on current status records
     function updateCommentStatusIndicators(statusRecords) {
         // Create a map for faster lookup
@@ -114,6 +194,61 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         });
+    }
+
+    // Load and execute all processed comments
+    async function loadAndExecuteProcessedComments() {
+        if (!isWebsim) return;
+        
+        try {
+            // Get all processed comments with generated code
+            const processedComments = await getProcessedComments();
+            
+            // Clear the container first
+            const container = document.getElementById('generated-components-container');
+            container.innerHTML = '';
+            
+            // Execute each generated code
+            for (const comment of processedComments) {
+                if (comment.generated_code) {
+                    try {
+                        const success = executeGeneratedCode(comment.generated_code, 'generated-components-container');
+                        if (!success) {
+                            // If execution failed, try to regenerate the code
+                            console.log(`Execution failed for comment ${comment.comment_id}, regenerating...`);
+                            
+                            // Get the comment content
+                            const response = await fetch(`/api/v1/projects/${currentProject.id}/comments`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                const commentObj = data.comments.data.find(c => c.comment.id === comment.comment_id);
+                                
+                                if (commentObj) {
+                                    let commentContent = '';
+                                    if (commentObj.comment.raw_content) {
+                                        commentContent = commentObj.comment.raw_content;
+                                    } else if (commentObj.comment.content && commentObj.comment.content.children) {
+                                        commentContent = extractTextFromDocument(commentObj.comment.content);
+                                    }
+                                    
+                                    if (commentContent) {
+                                        // Reprocess with LLM
+                                        const newCode = await processCommentWithLLM(comment.comment_id, commentContent);
+                                        if (newCode) {
+                                            executeGeneratedCode(newCode, 'generated-components-container');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Error executing code for comment ${comment.comment_id}:`, error);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading and executing processed comments:', error);
+        }
     }
 
     // Render comments to the DOM
@@ -423,16 +558,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
-    }
-
-    // Display project information
-    function displayProjectInfo(project) {
-        // Function kept for compatibility but not used
-    }
-
-    // Setup comment form submission
-    function setupCommentForm(projectId) {
-        // Function kept for compatibility but not used
     }
 
     // Attach event listeners to reaction buttons
