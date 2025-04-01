@@ -600,6 +600,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 button.textContent = 'Processing...';
                 
                 try {
+                    // First ensure we have a status record for this comment
+                    await getCommentProcessingStatus(commentId);
+                    
                     // Process the comment with LLM
                     const response = await processCommentWithLLM(commentId, commentContent);
                     
@@ -610,8 +613,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         throw new Error('Failed to execute generated code');
                     }
                     
-                    // Mark comment as processed and update UI
-                    await markCommentAsProcessed(commentId);
                     commentElement.dataset.responseExecuted = 'true';
                     
                     // Update the status indicators
@@ -621,10 +622,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (error) {
                     console.error('Error processing comment:', error);
                     
-                    // Show detailed error in the generated content container
+                    // Show error in the generated content container
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'error-container';
-                    errorDiv.innerHTML = `<strong>Error processing comment:</strong> ${error.message}<br><small>${error.stack ? error.stack.split('\n')[0] : ''}</small>`;
+                    errorDiv.textContent = `Error processing comment: ${error.message}`;
                     
                     const container = document.getElementById('generated-content-container');
                     container.appendChild(errorDiv);
