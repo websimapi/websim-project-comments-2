@@ -66,16 +66,54 @@ function subscribeToCommentStatusChanges(callback) {
 // Process a comment with the LLM and store the result
 async function processCommentWithLLM(commentId, commentContent) {
   try {
-    // Get the LLM to generate a response
+    // Check if the comment contains images
+    const commentElement = document.querySelector(`.comment[data-comment-id="${commentId}"]`);
+    const images = commentElement.querySelectorAll('.comment-content img');
+    
+    // Prepare message content array (supports text and images)
+    let messageContent = [];
+    
+    // Add the text content
+    messageContent.push({
+      type: "text",
+      text: `Create a small interactive component based on this comment: "${commentContent}". Respond with HTML, CSS, and JavaScript code only.`
+    });
+    
+    // Add any images found in the comment
+    if (images.length > 0) {
+      for (const img of images) {
+        try {
+          // Create a canvas to convert the image to a data URL
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          
+          // Draw the image to canvas and convert to data URL
+          ctx.drawImage(img, 0, 0);
+          const imageDataUrl = canvas.toDataURL('image/jpeg');
+          
+          // Add the image to the message content
+          messageContent.push({
+            type: "image_url",
+            image_url: { url: imageDataUrl }
+          });
+        } catch (imgError) {
+          console.error('Error processing image:', imgError);
+        }
+      }
+    }
+    
+    // Get the LLM to generate a response with text and images
     const completion = await websim.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that creates interactive UI components based on user comments. Generate HTML, CSS, and JavaScript code that responds to the user's comment."
+          content: "You are a helpful assistant that creates interactive UI components based on user comments. Generate HTML, CSS, and JavaScript code that responds to the user's comment and any images they've shared."
         },
         {
           role: "user",
-          content: `Create a small interactive component based on this comment: "${commentContent}". Respond with HTML, CSS, and JavaScript code only.`
+          content: messageContent
         }
       ]
     });
