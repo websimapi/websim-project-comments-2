@@ -621,10 +621,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (error) {
                     console.error('Error processing comment:', error);
                     
-                    // Show error in the generated content container
+                    // Show detailed error in the generated content container
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'error-container';
-                    errorDiv.textContent = `Error processing comment: ${error.message}`;
+                    errorDiv.innerHTML = `<strong>Error processing comment:</strong> ${error.message}<br><small>${error.stack ? error.stack.split('\n')[0] : ''}</small>`;
                     
                     const container = document.getElementById('generated-content-container');
                     container.appendChild(errorDiv);

@@ -74,67 +74,77 @@ async function processCommentWithLLM(commentId, commentContent) {
     
     // If there are images, first analyze them
     if (imageElements.length > 0) {
-      // Prepare image URLs for analysis
-      const imageUrls = Array.from(imageElements).map(img => img.src);
-      
-      // Create messages array with image content
-      const imageAnalysisMessages = [
-        {
-          role: "system",
-          content: "You are an image analysis assistant. Describe the content of the images you see in detail."
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Analyze these images in the comment: "${commentContent}". Describe what you see in detail.`
-            },
-            ...imageUrls.map(url => ({
-              type: "image_url",
-              image_url: { url }
-            }))
-          ]
-        }
-      ];
-      
-      // Analyze the images first
-      const imageCompletionResult = await websim.chat.completions.create({
-        messages: imageAnalysisMessages
-      });
-      
-      imageAnalysis = imageCompletionResult.content;
+      try {
+        // Prepare image URLs for analysis
+        const imageUrls = Array.from(imageElements).map(img => img.src);
+        
+        // Create messages array with image content
+        const imageAnalysisMessages = [
+          {
+            role: "system",
+            content: "You are an image analysis assistant. Describe the content of the images you see in detail."
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analyze these images in the comment: "${commentContent}". Describe what you see in detail.`
+              },
+              ...imageUrls.map(url => ({
+                type: "image_url",
+                image_url: { url }
+              }))
+            ]
+          }
+        ];
+        
+        // Analyze the images first
+        const imageCompletionResult = await websim.chat.completions.create({
+          messages: imageAnalysisMessages
+        });
+        
+        imageAnalysis = imageCompletionResult.content;
+      } catch (imgError) {
+        console.error('Error analyzing images:', imgError);
+        imageAnalysis = `[Image analysis failed: ${imgError.message}]`;
+      }
     }
     
     // Then generate the component based on the text content and image analysis
-    const completion = await websim.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that creates interactive UI components based on user comments. Generate HTML, CSS, and JavaScript code that responds to the user's comment."
-        },
-        {
-          role: "user",
-          content: `Create a small interactive component based on this comment: "${commentContent}"${imageAnalysis ? `. Image analysis: ${imageAnalysis}` : ''}. Respond with HTML, CSS, and JavaScript code only.`
-        }
-      ]
-    });
-    
-    // Store the generated response
-    const statusRecords = await room.collection('comment_status').filter({ comment_id: commentId }).getList();
-    
-    if (statusRecords && statusRecords.length > 0) {
-      await room.collection('comment_status').update(statusRecords[0].id, {
-        processed: true,
-        processed_at: new Date().toISOString(),
-        response: completion.content,
-        processed_by: window.websim ? (await window.websim.getUser()).username : 'unknown'
+    try {
+      const completion = await websim.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that creates interactive UI components based on user comments. Generate HTML, CSS, and JavaScript code that responds to the user's comment."
+          },
+          {
+            role: "user",
+            content: `Create a small interactive component based on this comment: "${commentContent}"${imageAnalysis ? `. Image analysis: ${imageAnalysis}` : ''}. Respond with HTML, CSS, and JavaScript code only.`
+          }
+        ]
       });
+      
+      // Store the generated response
+      const statusRecords = await room.collection('comment_status').filter({ comment_id: commentId }).getList();
+      
+      if (statusRecords && statusRecords.length > 0) {
+        await room.collection('comment_status').update(statusRecords[0].id, {
+          processed: true,
+          processed_at: new Date().toISOString(),
+          response: completion.content,
+          processed_by: window.websim ? (await window.websim.getUser()).username : 'unknown'
+        });
+      }
+      
+      return completion.content;
+    } catch (llmError) {
+      console.error('Error generating component with LLM:', llmError);
+      throw new Error(`LLM processing failed: ${llmError.message}`);
     }
-    
-    return completion.content;
   } catch (error) {
-    console.error('Error processing comment with LLM:', error);
+    console.error('Error in processCommentWithLLM:', error);
     throw error;
   }
 }
