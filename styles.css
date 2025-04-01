@@ -55,7 +55,7 @@ h3 {
 }
 
 #comments-container {
-    margin-bottom: 30px;
+    margin-bottom: 0;
 }
 
 .comment {
@@ -219,4 +219,3 @@ h3 {
     text-align: center;
     color: #718096;
 }
-

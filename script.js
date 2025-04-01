@@ -11,14 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentProject = await window.websim.getCurrentProject();
             currentUser = await window.websim.getUser();
             
-            // Update project info section
-            displayProjectInfo(currentProject);
-            
             // Load comments for the current project
             await loadComments(currentProject.id);
-            
-            // Setup comment form event listener
-            setupCommentForm(currentProject.id);
         } else {
             // Demo mode with sample data for when not running in Websim
             useDemoData();
@@ -360,62 +354,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Display project information
     function displayProjectInfo(project) {
-        const projectInfoElement = document.getElementById('project-info');
-        
-        if (project) {
-            projectInfoElement.innerHTML = `
-                <h2>${project.title || 'Untitled Project'}</h2>
-                <p>${project.description || 'No description provided'}</p>
-            `;
-        } else {
-            projectInfoElement.innerHTML = '<p>Project information not available</p>';
-        }
+        // Function kept for compatibility but not used
     }
 
     // Setup comment form submission
     function setupCommentForm(projectId) {
-        const commentForm = document.getElementById('comment-form');
-        
-        commentForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const contentTextarea = document.getElementById('comment-content');
-            const content = contentTextarea.value.trim();
-            
-            if (!content) return;
-            
-            try {
-                // Disable the form while submitting
-                const submitButton = commentForm.querySelector('button[type="submit"]');
-                submitButton.disabled = true;
-                submitButton.textContent = 'Posting...';
-                
-                const response = await fetch(`/api/v1/projects/${projectId}/comments`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ content }),
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to post comment: ${response.status}`);
-                }
-                
-                // Clear the form and reload comments
-                contentTextarea.value = '';
-                await loadComments(projectId);
-                
-            } catch (error) {
-                console.error('Error posting comment:', error);
-                alert(`Error posting comment: ${error.message}`);
-            } finally {
-                // Re-enable the form
-                const submitButton = commentForm.querySelector('button[type="submit"]');
-                submitButton.disabled = false;
-                submitButton.textContent = 'Post Comment';
-            }
-        });
+        // Function kept for compatibility but not used
     }
 
     // Attach event listeners to reaction buttons
@@ -543,8 +487,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             title: 'Demo Project',
             description: 'This is a demo project for testing the comments system'
         };
-        
-        displayProjectInfo(demoProject);
         
         const demoComments = {
             comments: {
@@ -696,13 +638,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
         
         renderComments(demoComments.comments.data);
-        
-        // Setup form for demo mode
-        const commentForm = document.getElementById('comment-form');
-        commentForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Comment submission is not available in demo mode');
-        });
     }
 });
-
