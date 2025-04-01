@@ -13,6 +13,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Load comments for the current project
             await loadComments(currentProject.id);
+            
+            // Subscribe to comment status changes
+            subscribeToCommentStatusChanges(async (statusRecords) => {
+                // Only update the UI if we already have comments loaded
+                const commentsContainer = document.getElementById('comments-container');
+                if (commentsContainer && !commentsContainer.querySelector('.loading')) {
+                    updateCommentStatusIndicators(statusRecords);
+                }
+            });
         } else {
             // Demo mode with sample data for when not running in Websim
             useDemoData();
@@ -39,6 +48,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (data.comments && data.comments.data) {
                 renderComments(data.comments.data);
+                
+                // After rendering comments, fetch and update their processing status
+                await updateAllCommentStatuses(data.comments.data);
             } else {
                 document.getElementById('comments-container').innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
             }
@@ -50,6 +62,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
         }
+    }
+    
+    // Update processing status for all comments
+    async function updateAllCommentStatuses(commentsData) {
+        // Collect all comment IDs to check
+        const commentIds = new Set();
+        for (const { comment } of commentsData) {
+            commentIds.add(comment.id);
+            
+            // Also add reply IDs
+            const replies = commentsData.filter(c => c.comment.parent_comment_id === comment.id);
+            for (const { comment: reply } of replies) {
+                commentIds.add(reply.id);
+            }
+        }
+        
+        // Get status for each comment
+        for (const commentId of commentIds) {
+            await getCommentProcessingStatus(commentId);
+        }
+    }
+    
+    // Update status indicators in the UI based on current status records
+    function updateCommentStatusIndicators(statusRecords) {
+        // Create a map for faster lookup
+        const statusMap = {};
+        for (const record of statusRecords) {
+            statusMap[record.comment_id] = record;
+        }
+        
+        // Update each comment's status indicator
+        const commentElements = document.querySelectorAll('.comment');
+        commentElements.forEach(element => {
+            const commentId = element.dataset.commentId;
+            const statusIndicator = element.querySelector('.processing-status');
+            
+            if (statusIndicator && commentId && statusMap[commentId]) {
+                const isProcessed = statusMap[commentId].processed;
+                const statusIcon = statusIndicator.querySelector('.status-icon');
+                const statusText = statusIndicator.querySelector('.status-text');
+                
+                if (isProcessed) {
+                    statusIcon.classList.remove('status-unprocessed');
+                    statusIcon.classList.add('status-processed');
+                    statusText.textContent = 'Processed';
+                } else {
+                    statusIcon.classList.remove('status-processed');
+                    statusIcon.classList.add('status-unprocessed');
+                    statusText.textContent = 'Unprocessed';
+                }
+            }
+        });
     }
 
     // Render comments to the DOM
@@ -137,12 +201,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const pinnedBadge = comment.pinned ? 
             `<span class="pinned-badge">Pinned by ${comment.pinned_by ? comment.pinned_by.username : 'moderator'}</span>` : '';
         
+        // Add processing status indicator
+        const processingStatus = `
+            <div class="processing-status">
+                <div class="status-icon status-unprocessed"></div>
+                <span class="status-text">Unprocessed</span>
+            </div>
+        `;
+        
         return `
             <div class="comment" data-comment-id="${comment.id}" data-cursor="${cursor}">
                 <div class="comment-header">
                     <img class="avatar" src="${avatarUrl}" alt="${authorUsername}'s avatar">
                     <a href="https://websim.ai/@${authorUsername}" class="user-name">@${authorUsername}</a>
                     ${pinnedBadge}
+                    ${processingStatus}
                     <span class="comment-date">${formattedDate}</span>
                 </div>
                 <div class="comment-content">

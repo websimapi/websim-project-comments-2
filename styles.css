@@ -82,6 +82,32 @@ h3 {
     object-fit: cover;
 }
 
+.processing-status {
+    margin-left: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.status-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-unprocessed {
+    background-color: #eab308;
+}
+
+.status-processed {
+    background-color: #22c55e;
+}
+
+.status-text {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
 .user-name {
     font-weight: 600;
     color: #4a5568;
