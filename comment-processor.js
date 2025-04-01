@@ -66,54 +66,56 @@ function subscribeToCommentStatusChanges(callback) {
 // Process a comment with the LLM and store the result
 async function processCommentWithLLM(commentId, commentContent) {
   try {
-    // Check if the comment contains images
+    // Check if the comment contains image elements
     const commentElement = document.querySelector(`.comment[data-comment-id="${commentId}"]`);
-    const images = commentElement.querySelectorAll('.comment-content img');
+    const imageElements = commentElement ? commentElement.querySelectorAll('.comment-content img') : [];
     
-    // Prepare message content array (supports text and images)
-    let messageContent = [];
+    let imageAnalysis = '';
     
-    // Add the text content
-    messageContent.push({
-      type: "text",
-      text: `Create a small interactive component based on this comment: "${commentContent}". Respond with HTML, CSS, and JavaScript code only.`
-    });
-    
-    // Add any images found in the comment
-    if (images.length > 0) {
-      for (const img of images) {
-        try {
-          // Create a canvas to convert the image to a data URL
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          
-          // Draw the image to canvas and convert to data URL
-          ctx.drawImage(img, 0, 0);
-          const imageDataUrl = canvas.toDataURL('image/jpeg');
-          
-          // Add the image to the message content
-          messageContent.push({
-            type: "image_url",
-            image_url: { url: imageDataUrl }
-          });
-        } catch (imgError) {
-          console.error('Error processing image:', imgError);
+    // If there are images, first analyze them
+    if (imageElements.length > 0) {
+      // Prepare image URLs for analysis
+      const imageUrls = Array.from(imageElements).map(img => img.src);
+      
+      // Create messages array with image content
+      const imageAnalysisMessages = [
+        {
+          role: "system",
+          content: "You are an image analysis assistant. Describe the content of the images you see in detail."
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Analyze these images in the comment: "${commentContent}". Describe what you see in detail.`
+            },
+            ...imageUrls.map(url => ({
+              type: "image_url",
+              image_url: { url }
+            }))
+          ]
         }
-      }
+      ];
+      
+      // Analyze the images first
+      const imageCompletionResult = await websim.chat.completions.create({
+        messages: imageAnalysisMessages
+      });
+      
+      imageAnalysis = imageCompletionResult.content;
     }
     
-    // Get the LLM to generate a response with text and images
+    // Then generate the component based on the text content and image analysis
     const completion = await websim.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that creates interactive UI components based on user comments. Generate HTML, CSS, and JavaScript code that responds to the user's comment and any images they've shared."
+          content: "You are a helpful assistant that creates interactive UI components based on user comments. Generate HTML, CSS, and JavaScript code that responds to the user's comment."
         },
         {
           role: "user",
-          content: messageContent
+          content: `Create a small interactive component based on this comment: "${commentContent}"${imageAnalysis ? `. Image analysis: ${imageAnalysis}` : ''}. Respond with HTML, CSS, and JavaScript code only.`
         }
       ]
     });
